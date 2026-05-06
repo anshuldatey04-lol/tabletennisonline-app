@@ -803,7 +803,7 @@ function handleTouch(touch) {
   crosshair.style.top  = (cy * zoneBounds.height) + 'px';
 
   // Map 0-1 to world coords and send as racketInput
-  const worldX = (cx - 0.5) * 2 * 0.76;
+  const worldX = (cx - 0.5) * 2 * 1.4;
   socket.emit('racketInput', { x: worldX, side: playerRole });
 }
 
