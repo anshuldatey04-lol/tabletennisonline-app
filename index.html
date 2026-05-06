@@ -3,129 +3,824 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>🏓 Racket Controller</title>
+  <title>🏓 TT Controller</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#3b82f6">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
       --bg: #0f172a;
-      --primary: #3b82f6;
+      --surface: #1e293b;
       --red: #ef4444;
       --blue: #3b82f6;
+      --green: #22c55e;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
     }
-    body {
-      margin: 0;
-      padding: 0;
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
       background: var(--bg);
-      color: white;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: fixed;
+      inset: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      overflow: hidden;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── HOME SCREEN ── */
+    .logo {
+      font-size: 52px;
+      margin-bottom: 8px;
+    }
+    .logo-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+    .logo-sub {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 360px;
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
       text-align: center;
     }
-    .container {
-      width: 90%;
-      max-width: 400px;
+
+    /* 6 digit boxes */
+    .code-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 2rem; }
-    .status {
-      margin-bottom: 2rem;
-      padding: 1rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
-      font-size: 0.9rem;
+    .digit {
+      width: 42px;
+      height: 54px;
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+      outline: none;
+      caret-color: var(--blue);
+      -webkit-appearance: none;
+      transition: border-color 0.2s;
     }
-    .controls {
-      display: grid;
-      gap: 1rem;
-      width: 100%;
+    .digit:focus { border-color: var(--blue); }
+
+    .join-row {
+      display: flex;
+      gap: 10px;
     }
-    button {
-      padding: 1.25rem;
+
+    .btn {
+      flex: 1;
+      padding: 16px;
       border: none;
       border-radius: 12px;
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
       cursor: pointer;
-      transition: transform 0.1s;
-    }
-    button:active { transform: scale(0.95); }
-    #btn-start { background: var(--primary); color: white; }
-    #btn-calibrate { background: rgba(255, 255, 255, 0.15); color: white; display: none; }
-    .debug {
-      margin-top: 2rem;
-      font-family: monospace;
-      font-size: 0.75rem;
-      opacity: 0.5;
-      text-align: left;
-      width: 100%;
-    }
-    .hidden { display: none !important; }
-    .role-indicator {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 8px;
-      vertical-align: middle;
-    }
-    .role-red { background: var(--red); }
-    .role-blue { background: var(--blue); }
-    .server-input {
-      background: rgba(255,255,255,0.1);
-      border: none;
       color: white;
-      padding: 8px;
-      border-radius: 8px;
-      font-size: 0.8rem;
-      margin-top: 10px;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+    .btn:active { transform: scale(0.96); opacity: 0.85; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-red  { background: var(--red);  box-shadow: 0 4px 20px rgba(239,68,68,0.3); }
+    .btn-blue { background: var(--blue); box-shadow: 0 4px 20px rgba(59,130,246,0.3); }
+    .btn-gray { background: rgba(255,255,255,0.12); }
+    .btn-green { background: var(--green); box-shadow: 0 4px 20px rgba(34,197,94,0.3); }
+
+    .error {
+      font-size: 13px;
+      color: var(--red);
+      text-align: center;
+      min-height: 18px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .error.show { opacity: 1; }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    /* connecting spinner */
+    .spinner-wrap {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 99;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .spinner-wrap.show { opacity: 1; pointer-events: all; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-text {
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── GAME SCREEN ── */
+    #game {
+      justify-content: flex-start;
+      padding: 0;
+    }
+
+    .topbar {
       width: 100%;
-      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+
+    .player-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .color-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      animation: glow 2s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%,100% { box-shadow: 0 0 6px currentColor; }
+      50%      { box-shadow: 0 0 16px currentColor; }
+    }
+    .player-name {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .live-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 20px;
+      padding: 4px 10px;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: blink 1.2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+    .live-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .game-title-area {
+      padding: 18px 20px 14px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .game-heading {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .game-sub {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      margin-top: 4px;
+    }
+
+    /* touch zone */
+    .touch-zone {
+      flex: 1;
+      width: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    .touch-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 40px);
+    }
+    .zone-glow {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, var(--zone-color, rgba(59,130,246,0.08)) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .zone-hint {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+      opacity: 0.35;
+      transition: opacity 0.3s;
+    }
+    .zone-hint.hidden-hint { opacity: 0; }
+    .zone-hint-icon { font-size: 36px; }
+    .zone-hint-text { font-size: 13px; color: var(--muted); letter-spacing: 1px; text-align: center; }
+
+    .crosshair {
+      position: absolute;
+      width: 50px; height: 50px;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, -50%);
+      transition: opacity 0.1s;
+    }
+    .crosshair.show { opacity: 1; }
+    .crosshair::before, .crosshair::after {
+      content: '';
+      position: absolute;
+      background: var(--player-color, #3b82f6);
+      border-radius: 2px;
+      opacity: 0.8;
+    }
+    .crosshair::before { width: 2px; height: 100%; left: 50%; top: 0; transform: translateX(-50%); }
+    .crosshair::after  { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
+    .crosshair-ring {
+      position: absolute;
+      inset: 0;
+      border: 2px solid var(--player-color, #3b82f6);
+      border-radius: 50%;
+      opacity: 0.5;
+    }
+
+    /* handle */
+    .handle {
+      width: 100%;
+      height: 120px;
+      flex-shrink: 0;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .handle-bg {
+      position: absolute;
+      inset: 0;
+      background: var(--player-color, #3b82f6);
+      opacity: 0.9;
+    }
+    .handle-grips {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      gap: 6px;
+      opacity: 0.3;
+    }
+    .grip { width: 3px; height: 44px; background: rgba(0,0,0,0.6); border-radius: 2px; }
+    .handle-text {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      white-space: nowrap;
+      z-index: 3;
+    }
+
+    .exit-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 16px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.6);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .exit-btn:active { background: rgba(0,0,0,0.6); color: white; }
+
+    /* sensor activate button inside game */
+    .sensor-btn-wrap {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .sensor-btn-wrap.hidden { display: none; }
+    .sensor-btn {
+      padding: 16px 32px;
+      background: var(--player-color, #3b82f6);
+      border: none;
+      border-radius: 14px;
+      color: white;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    .sensor-sub { font-size: 12px; color: var(--muted); }
+
+    /* calibrate btn */
+    .calibrate-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      z-index: 10;
+      display: none;
+    }
+
+    /* debug */
+    .debug-overlay {
+      position: absolute;
+      bottom: 60px;
+      left: 12px;
+      font-family: monospace;
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      pointer-events: none;
+      line-height: 1.6;
     }
   </style>
 </head>
 <body>
 
-  <div class="container" id="setup-view">
-    <h1>Connect Controller</h1>
-    <div class="status" id="setup-status">
-      Enter the 6-digit code from your computer
-      <input type="text" id="input-server" placeholder="Server: http://localhost:3000" class="server-input">
+<!-- ── HOME SCREEN ── -->
+<div class="screen active" id="home">
+  <div class="logo">🏓</div>
+  <div class="logo-title">TT Controller</div>
+  <div class="logo-sub">Table Tennis Online</div>
+
+  <div class="card">
+    <div class="card-label">Enter Game Code</div>
+    <div class="code-row" id="codeRow">
+      <input class="digit" maxlength="1" type="tel" inputmode="numeric">
+      <input class="digit" maxlength="1" type="tel" inputmode="numeric">
+      <input class="digit" maxlength="1" type="tel" inputmode="numeric">
+      <input class="digit" maxlength="1" type="tel" inputmode="numeric">
+      <input class="digit" maxlength="1" type="tel" inputmode="numeric">
+      <input class="digit" maxlength="1" type="tel" inputmode="numeric">
     </div>
-    <div class="controls">
-      <input type="text" id="input-code" placeholder="123456" 
-             style="padding: 1rem; border-radius: 12px; border: none; font-size: 1.5rem; text-align: center; margin-bottom: 1rem;">
-      <div style="display: flex; gap: 10px;">
-        <button id="btn-join-red" style="flex: 1; background: var(--red);">Join RED</button>
-        <button id="btn-join-blue" style="flex: 1; background: var(--blue);">Join BLUE</button>
-      </div>
+    <div class="error" id="errorMsg">Invalid code. Try again.</div>
+    <div class="join-row">
+      <button class="btn btn-red"  id="btnRed"  disabled>Join RED</button>
+      <button class="btn btn-blue" id="btnBlue" disabled>Join BLUE</button>
+    </div>
+    <div class="hint">Open the game on PC and enter<br>the 6-digit code shown on screen</div>
+  </div>
+</div>
+
+<!-- ── GAME SCREEN ── -->
+<div class="screen" id="game">
+  <div class="topbar">
+    <div class="player-pill">
+      <div class="color-dot" id="colorDot"></div>
+      <span class="player-name" id="playerName">Player</span>
+    </div>
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      <span class="live-label">Live</span>
     </div>
   </div>
 
-  <div class="container hidden" id="game-view">
-    <h1><span id="role-badge" class="role-indicator"></span> Controller</h1>
-    <div class="status" id="game-status">Connected to session: <span id="display-code"></span></div>
-    
-    <div class="controls">
-      <button id="btn-start">ACTIVATE SENSORS</button>
-      <button id="btn-calibrate">CALIBRATE</button>
-    </div>
-
-    <div class="debug" id="debug-info">
-      Waiting for sensor data...
-    </div>
+  <div class="game-title-area">
+    <div class="game-heading">The Game Is Live</div>
+    <div class="game-sub" id="gameSub">Tilt your phone to move the racket</div>
   </div>
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
+  <div class="touch-zone" id="touchZone">
+    <div class="zone-glow" id="zoneGlow"></div>
+    <div class="zone-hint" id="zoneHint">
+      <div class="zone-hint-icon">✋</div>
+      <div class="zone-hint-text">Touch &amp; drag here<br>to move your racket</div>
+    </div>
+    <div class="crosshair" id="crosshair"><div class="crosshair-ring"></div></div>
+
+    <!-- Activate sensors button shown before sensors start -->
+    <div class="sensor-btn-wrap" id="sensorBtnWrap">
+      <button class="sensor-btn" id="sensorBtn">Activate Sensors</button>
+      <div class="sensor-sub">Required to control the racket</div>
+    </div>
+
+    <button class="calibrate-btn" id="calibrateBtn">⟳ Calibrate</button>
+    <div class="debug-overlay" id="debugOverlay">Waiting for sensor data...</div>
+  </div>
+
+  <div class="handle" id="handle">
+    <div class="handle-bg" id="handleBg"></div>
+    <div class="handle-grips">
+      <div class="grip"></div><div class="grip"></div><div class="grip"></div>
+      <div class="grip"></div><div class="grip"></div><div class="grip"></div>
+      <div class="grip"></div><div class="grip"></div>
+    </div>
+    <div class="handle-text" id="handleText">Hold Here</div>
+    <button class="exit-btn" id="exitBtn">Exit</button>
+  </div>
+</div>
+
+<!-- Connecting overlay -->
+<div class="spinner-wrap" id="spinnerWrap">
+  <div class="spinner"></div>
+  <div class="spinner-text">Connecting...</div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const SERVER = 'https://tabletennis-pruj.onrender.com';
+
+const COLORS = {
+  red:  { hex: '#ef4444', glow: 'rgba(239,68,68,0.12)',  name: 'Player 1 (RED)'  },
+  blue: { hex: '#3b82f6', glow: 'rgba(59,130,246,0.12)', name: 'Player 2 (BLUE)' }
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let socket       = null;
+let playerRole   = null;
+let isTracking   = false;
+let lastOri      = { alpha: 0, beta: 0, gamma: 0 };
+let lastAcc      = { x: 0, y: 0, z: 0 };
+let calOffset    = { alpha: 0, beta: 0, gamma: 0 };
+let sendTimer    = null;
+let touchActive  = false;
+let zoneBounds   = null;
+
+// ── DOM ───────────────────────────────────────────────────────────────────────
+const homeScreen    = document.getElementById('home');
+const gameScreen    = document.getElementById('game');
+const digits        = document.querySelectorAll('.digit');
+const btnRed        = document.getElementById('btnRed');
+const btnBlue       = document.getElementById('btnBlue');
+const errorMsg      = document.getElementById('errorMsg');
+const spinnerWrap   = document.getElementById('spinnerWrap');
+const colorDot      = document.getElementById('colorDot');
+const playerName    = document.getElementById('playerName');
+const zoneGlow      = document.getElementById('zoneGlow');
+const zoneHint      = document.getElementById('zoneHint');
+const crosshair     = document.getElementById('crosshair');
+const sensorBtnWrap = document.getElementById('sensorBtnWrap');
+const sensorBtn     = document.getElementById('sensorBtn');
+const calibrateBtn  = document.getElementById('calibrateBtn');
+const debugOverlay  = document.getElementById('debugOverlay');
+const handleBg      = document.getElementById('handleBg');
+const handleText    = document.getElementById('handleText');
+const exitBtn       = document.getElementById('exitBtn');
+const touchZone     = document.getElementById('touchZone');
+
+// ── CODE INPUT ────────────────────────────────────────────────────────────────
+digits.forEach((d, i) => {
+  d.addEventListener('input', e => {
+    const v = e.target.value.replace(/\D/g, '');
+    e.target.value = v.slice(-1);
+    if (v && i < digits.length - 1) digits[i + 1].focus();
+    updateBtns();
+    hideError();
+  });
+  d.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !d.value && i > 0) {
+      digits[i - 1].focus();
+      digits[i - 1].value = '';
+      updateBtns();
     }
-  </script>
-  <script src="js/controller-smartphone.js"></script>
+  });
+  d.addEventListener('paste', e => {
+    const p = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+    if (p.length === 6) {
+      digits.forEach((inp, idx) => inp.value = p[idx] || '');
+      digits[5].focus();
+      updateBtns();
+    }
+    e.preventDefault();
+  });
+});
+
+function getCode() { return Array.from(digits).map(d => d.value).join(''); }
+function updateBtns() {
+  const ok = getCode().length === 6;
+  btnRed.disabled = !ok;
+  btnBlue.disabled = !ok;
+}
+function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('show'); }
+function hideError() { errorMsg.classList.remove('show'); }
+
+// ── JOIN ──────────────────────────────────────────────────────────────────────
+btnRed.addEventListener('click',  () => connect('red'));
+btnBlue.addEventListener('click', () => connect('blue'));
+
+function connect(role) {
+  const code = getCode();
+  if (code.length !== 6) return;
+
+  spinnerWrap.classList.add('show');
+  hideError();
+  playerRole = role;
+
+  if (socket) { socket.disconnect(); socket = null; }
+
+  socket = io(SERVER, {
+    transports: ['websocket', 'polling'],
+    timeout: 8000,
+    reconnection: false
+  });
+
+  socket.on('connect', () => {
+    socket.emit('phoneConnect', { code, role });
+  });
+
+  socket.on('phoneReady', () => {
+    spinnerWrap.classList.remove('show');
+    applyColor(role);
+    showScreen('game');
+  });
+
+  socket.on('phoneError', data => {
+    spinnerWrap.classList.remove('show');
+    showError(data.message || 'Invalid code. Check and retry.');
+    socket.disconnect(); socket = null;
+  });
+
+  socket.on('connect_error', () => {
+    spinnerWrap.classList.remove('show');
+    showError('Cannot reach server. Same Wi-Fi as PC?');
+    socket = null;
+  });
+
+  socket.on('disconnect', () => {
+    if (gameScreen.classList.contains('active')) goHome();
+  });
+
+  setTimeout(() => {
+    if (spinnerWrap.classList.contains('show')) {
+      spinnerWrap.classList.remove('show');
+      showError('Timed out. Is the game running on PC?');
+      if (socket) { socket.disconnect(); socket = null; }
+    }
+  }, 9000);
+}
+
+// ── COLOR ─────────────────────────────────────────────────────────────────────
+function applyColor(role) {
+  const c = COLORS[role] || COLORS.red;
+  document.documentElement.style.setProperty('--player-color', c.hex);
+  colorDot.style.background = c.hex;
+  colorDot.style.color = c.hex;
+  playerName.textContent = c.name;
+  playerName.style.color = c.hex;
+  zoneGlow.style.setProperty('--zone-color', c.glow);
+  zoneGlow.style.background = `radial-gradient(ellipse at center, ${c.glow} 0%, transparent 70%)`;
+  handleBg.style.background = c.hex;
+  handleText.textContent = `${role.toUpperCase()} — Hold Here`;
+}
+
+// ── SCREENS ───────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  if (socket) { socket.disconnect(); socket = null; }
+  stopTracking();
+  showScreen('home');
+  digits.forEach(d => d.value = '');
+  updateBtns();
+  hideError();
+  sensorBtnWrap.classList.remove('hidden');
+  calibrateBtn.style.display = 'none';
+  isTracking = false;
+}
+
+exitBtn.addEventListener('click', goHome);
+
+// ── SENSORS ───────────────────────────────────────────────────────────────────
+sensorBtn.addEventListener('click', requestSensorPermission);
+
+async function requestSensorPermission() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const r1 = await DeviceOrientationEvent.requestPermission();
+      const r2 = await DeviceMotionEvent.requestPermission();
+      if (r1 === 'granted' && r2 === 'granted') {
+        startTracking();
+      } else {
+        alert('Motion permission denied. Tilt control won\'t work — use touch instead.');
+        startTracking(); // still allow touch
+      }
+    } catch (e) {
+      startTracking(); // fallback
+    }
+  } else {
+    startTracking(); // Android — no permission needed
+  }
+}
+
+function startTracking() {
+  isTracking = true;
+  sensorBtnWrap.classList.add('hidden');
+  calibrateBtn.style.display = 'block';
+  zoneHint.classList.add('hidden-hint');
+
+  window.addEventListener('deviceorientation', handleOrientation, true);
+  window.addEventListener('devicemotion', handleMotion, true);
+
+  // send at 30fps
+  sendTimer = setInterval(sendData, 1000 / 30);
+
+  setupTouch();
+}
+
+function stopTracking() {
+  isTracking = false;
+  window.removeEventListener('deviceorientation', handleOrientation, true);
+  window.removeEventListener('devicemotion', handleMotion, true);
+  if (sendTimer) { clearInterval(sendTimer); sendTimer = null; }
+}
+
+function handleOrientation(e) {
+  lastOri = { alpha: e.alpha || 0, beta: e.beta || 0, gamma: e.gamma || 0 };
+  debugOverlay.innerHTML =
+    `α ${lastOri.alpha.toFixed(1)}° &nbsp; β ${lastOri.beta.toFixed(1)}° &nbsp; γ ${lastOri.gamma.toFixed(1)}°`;
+}
+
+function handleMotion(e) {
+  const a = e.accelerationIncludingGravity || e.acceleration;
+  if (a) lastAcc = { x: a.x || 0, y: a.y || 0, z: a.z || 0 };
+}
+
+calibrateBtn.addEventListener('click', () => {
+  calOffset = { ...lastOri };
+  calibrateBtn.textContent = '✅ Calibrated';
+  setTimeout(() => { calibrateBtn.textContent = '⟳ Calibrate'; }, 2000);
+});
+
+function sendData() {
+  if (!isTracking || !socket || !socket.connected) return;
+
+  const beta  = lastOri.beta  - calOffset.beta;
+  const gamma = lastOri.gamma - calOffset.gamma;
+  const alpha = lastOri.alpha - calOffset.alpha;
+
+  socket.emit('motionData', {
+    type: 'motion_data',
+    rotation:     { x: beta, y: gamma, z: alpha },
+    acceleration: lastAcc,
+    side: playerRole
+  });
+}
+
+// ── TOUCH ─────────────────────────────────────────────────────────────────────
+function setupTouch() {
+  touchZone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    zoneBounds = touchZone.getBoundingClientRect();
+    handleTouch(e.touches[0]);
+    crosshair.classList.add('show');
+    touchActive = true;
+  }, { passive: false });
+
+  touchZone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    handleTouch(e.touches[0]);
+  }, { passive: false });
+
+  touchZone.addEventListener('touchend', () => {
+    crosshair.classList.remove('show');
+    touchActive = false;
+  });
+}
+
+function handleTouch(touch) {
+  if (!zoneBounds || !socket || !socket.connected) return;
+  const x = (touch.clientX - zoneBounds.left) / zoneBounds.width;
+  const y = (touch.clientY - zoneBounds.top)  / zoneBounds.height;
+  const cx = Math.max(0, Math.min(1, x));
+  const cy = Math.max(0, Math.min(1, y));
+
+  crosshair.style.left = (cx * zoneBounds.width)  + 'px';
+  crosshair.style.top  = (cy * zoneBounds.height) + 'px';
+
+  // Map 0-1 to world coords and send as racketInput
+  const worldX = (cx - 0.5) * 2 * 0.76;
+  socket.emit('racketInput', { x: worldX, side: playerRole });
+}
+
+// ── PREVENT SCROLL ────────────────────────────────────────────────────────────
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+// ── WAKE LOCK ─────────────────────────────────────────────────────────────────
+async function keepAwake() {
+  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (_) {}
+}
+keepAwake();
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  digits[0].focus();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('service.js');
+});
+</script>
 </body>
 </html>
