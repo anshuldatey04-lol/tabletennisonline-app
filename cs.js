@@ -31,7 +31,7 @@
 
   // ── Connection ─────────────────────────────────────────────────────────────
   function init() {
-    const serverUrl = UI.inputServer.value.trim() || window.location.origin;
+    const serverUrl = UI.inputServer.value.trim() || 'https://tabletennis-pruj.onrender.com';
     socket = io(serverUrl, {
       transports: ['websocket', 'polling']
     });
